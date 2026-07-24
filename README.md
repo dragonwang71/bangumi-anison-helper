@@ -7,7 +7,7 @@ Bangumi・Annict の作品ページから、アニメの OP・ED 情報をすぐ
 ## インストール
 
 1. [Tampermonkey](https://www.tampermonkey.net/) などのユーザースクリプトマネージャーをブラウザに追加します。
-2. [Bangumi Anison Helper をインストール](https://raw.githubusercontent.com/dragonwang71/bangumi-anison-helper/main/bangumi-anison-helper.user.js) を開き、表示された確認画面でインストールします。
+2. [Greasy Fork から Bangumi Anison Helper をインストール](https://greasyfork.org/scripts/588327-bangumi-anison-helper) を開き、「スクリプトをインストール」を選びます。
 3. Bangumi または Annict の対応ページを開きます。
 
 対応ページ:
@@ -28,7 +28,7 @@ Bangumi・Annict の作品ページから、アニメの OP・ED 情報をすぐ
 
 ## 使い方
 
-作品ページのタイトル付近に表示される「曲目」ボタンを押すと、主題歌一覧が開きます。各曲の行から Mora と YouTube を利用でき、列の内容はクリックでコピーできます。
+作品ページではタイトル付近の「Anison」、一覧ページでは作品ごとの「曲目」を押すと、主題歌一覧が開きます。各曲の行から Mora と YouTube を利用でき、列の内容はクリックでコピーできます。
 
 Mora の自動検索は表のヘッダーでオン・オフを切り替えられます。リンクを再利用する小さなウィンドウで開くか、新しいタブで開くかも選択できます。
 
@@ -47,8 +47,6 @@ Mora 検索では曲名と歌手名を基本にし、キャラクター名と声
 - 外部サイトのデータやページ構造が変わると、検索や試聴が動作しない場合があります。
 - 楽曲情報の正確性と網羅性は外部データソースに依存します。
 - Mora の配信・試聴可否は作品や地域によって異なります。
-- 本スクリプトは Bangumi、Annict、Anison Generation、Mora、YouTube の公式プロジェクトではありません。
-
 ## 開発
 
 Node.js で構文チェックとテストを実行できます。追加パッケージは不要です。
