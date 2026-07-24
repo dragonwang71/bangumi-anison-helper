@@ -1,0 +1,11 @@
+{
+  "name": "bangumi-anison-helper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A userscript that adds anime opening and ending song lookup to Bangumi and Annict.",
+  "scripts": {
+    "check": "node --check bangumi-anison-helper.user.js",
+    "test": "npm run check && node --test tests/*.test.js"
+  },
+  "license": "MIT"
+}
