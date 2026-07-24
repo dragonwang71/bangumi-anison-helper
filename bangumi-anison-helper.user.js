@@ -7,6 +7,8 @@
 // @description  Show anime opening and ending songs on Bangumi and Annict with Mora previews and YouTube search.
 // @description:ja Bangumi・Annictの作品ページにアニメ主題歌情報を表示し、Mora試聴とYouTube検索を追加します。
 // @description:zh-CN 在 Bangumi 和 Annict 作品页显示动画 OP/ED 信息，并提供 Mora 试听与 YouTube 搜索。
+// @homepageURL  https://github.com/dragonwang71/bangumi-anison-helper
+// @supportURL   https://github.com/dragonwang71/bangumi-anison-helper/issues
 // @updateURL    https://raw.githubusercontent.com/dragonwang71/bangumi-anison-helper/main/bangumi-anison-helper.user.js
 // @downloadURL  https://raw.githubusercontent.com/dragonwang71/bangumi-anison-helper/main/bangumi-anison-helper.user.js
 // @match        https://bangumi.tv/subject/*
