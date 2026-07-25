@@ -13,7 +13,10 @@ const helpers = loadHelpers([
   'getFirstBySpace',
   'getFirstByPunctuation',
   'isTooGenericQuery',
-  'buildAnisonQueryCandidates'
+  'buildAnisonQueryCandidates',
+  'getMyAnimeListAnimeIdFromHref',
+  'getMyAnimeListLabeledTitle',
+  'getMyAnimeListTitleCandidatesFromDocument'
 ]);
 
 test('Mora search can use the credited voice actor without losing safe fallbacks', () => {
@@ -48,4 +51,73 @@ test('generic one-character fallbacks are rejected', () => {
   assert.equal(helpers.isTooGenericQuery('A'), true);
   assert.equal(helpers.isTooGenericQuery('ぼ'), true);
   assert.equal(helpers.isTooGenericQuery('ぼっち・ざ・ろっく！'), false);
+});
+
+test('MAL anime ids are stable with or without a title slug', () => {
+  assert.equal(
+    helpers.getMyAnimeListAnimeIdFromHref(
+      'https://myanimelist.net/anime/51553/Tongari_Boushi_no_Atelier'
+    ),
+    '51553'
+  );
+  assert.equal(helpers.getMyAnimeListAnimeIdFromHref('/anime/52991'), '52991');
+  assert.equal(
+    helpers.getMyAnimeListAnimeIdFromHref('https://example.com/anime/52991'),
+    ''
+  );
+});
+
+test('MAL title candidates prefer Japanese, then English, then visible fallbacks', () => {
+  function labelNode(label, value) {
+    return {
+      textContent: `${label}:`,
+      closest() {
+        return { textContent: `${label}: ${value}` };
+      },
+      parentElement: null
+    };
+  }
+
+  const japanese = labelNode('Japanese', 'ロミオの青い空');
+  const english = labelNode('English', "Romeo's Blue Skies");
+  const doc = {
+    querySelectorAll() {
+      return [japanese, english];
+    },
+    querySelector() {
+      return { textContent: 'Romeo no Aoi Sora' };
+    }
+  };
+
+  assert.equal(
+    helpers.getMyAnimeListLabeledTitle(doc, 'Japanese'),
+    'ロミオの青い空'
+  );
+  assert.deepEqual(
+    Array.from(helpers.getMyAnimeListTitleCandidatesFromDocument(doc, 'Romeo no Aoi Sora')),
+    ['ロミオの青い空', "Romeo's Blue Skies", 'Romeo no Aoi Sora']
+  );
+});
+
+test('MAL keeps a Chinese original stored in the Japanese field as the first candidate', () => {
+  const chineseOriginal = {
+    textContent: 'Japanese:',
+    closest() {
+      return { textContent: 'Japanese: 时光代理人' };
+    },
+    parentElement: null
+  };
+  const doc = {
+    querySelectorAll() {
+      return [chineseOriginal];
+    },
+    querySelector() {
+      return { textContent: 'Shiguang Dailiren' };
+    }
+  };
+
+  assert.deepEqual(
+    Array.from(helpers.getMyAnimeListTitleCandidatesFromDocument(doc, 'Shiguang Dailiren')),
+    ['时光代理人', 'Shiguang Dailiren']
+  );
 });

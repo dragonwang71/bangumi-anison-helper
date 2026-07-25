@@ -2,7 +2,7 @@
 
 [日本語](README.md) | [English](README.en.md)
 
-Bangumi・Annict の作品ページから、アニメの OP・ED 情報をすぐに確認できるユーザースクリプトです。曲名と歌手名をコピーし、Mora の試聴・商品ページや YouTube の検索結果へ移動できます。
+Bangumi・Annict・MyAnimeList の作品ページから、アニメの OP・ED 情報をすぐに確認できるユーザースクリプトです。曲名と歌手名をコピーし、Mora の試聴・商品ページや YouTube の検索結果へ移動できます。
 
 ![Bangumi Anison Helper の表示例](docs/screenshot.png)
 
@@ -10,13 +10,14 @@ Bangumi・Annict の作品ページから、アニメの OP・ED 情報をすぐ
 
 1. [Tampermonkey](https://www.tampermonkey.net/) などのユーザースクリプトマネージャーをブラウザに追加します。
 2. [Greasy Fork から Bangumi Anison Helper をインストール](https://greasyfork.org/scripts/588327-bangumi-anison-helper) を開き、「スクリプトをインストール」を選びます。
-3. Bangumi または Annict の対応ページを開きます。
+3. Bangumi、Annict、MyAnimeList の対応ページを開きます。
 
 対応ページ:
 
 - Bangumi の作品ページ
 - Bangumi のアニメ一覧ページ
 - Annict の作品ページ・作品一覧ページ
+- MyAnimeList のアニメ作品ページ・季節一覧・検索／ジャンル一覧ページ
 
 ## 主な機能
 
@@ -28,11 +29,13 @@ Bangumi・Annict の作品ページから、アニメの OP・ED 情報をすぐ
 - 操作表示を日本語・英語から選択（初期設定は日本語）
 - 表記揺れ、シーズン表記、記号を考慮した複数の検索候補
 - Bangumi と Annict の一覧ページから作品ごとに検索
+- MyAnimeList では作品ページの Japanese、English、通常タイトルを順に検索
+- MyAnimeList の一覧ページでは、クリックした作品のページからタイトル候補を取得して検索
 - Annict のホームから今期のアニメへ移動した直後も、再読み込みせずにボタンを表示
 
 ## 使い方
 
-作品ページではタイトル付近の「Anison」、一覧ページでは作品ごとの「A」を押すと、主題歌一覧が開きます。各曲の行から Mora と YouTube を利用でき、列の内容はクリックでコピーできます。
+作品ページではタイトル付近の「Anison」、一覧ページでは作品ごとの「A」を押すと、主題歌一覧が開きます。MyAnimeList の一覧では、クリック時にその作品ページからタイトル候補を取得します。各曲の行から Mora と YouTube を利用でき、列の内容はクリックでコピーできます。
 
 Mora の自動検索は表のヘッダーでオン・オフを切り替えられます。リンクを再利用する小さなウィンドウで開くか、新しいタブで開くかも選択できます。
 
@@ -46,7 +49,7 @@ Mora 検索では曲名と歌手名を基本にし、キャラクター名と声
 
 ## プライバシー
 
-このスクリプトは利用状況や個人情報を収集しません。作品・楽曲の検索時に Anison Generation と Mora へリクエストを送ります。表示言語を含む表示設定はブラウザの `localStorage` に保存されます。
+このスクリプトは利用状況や個人情報を収集しません。作品・楽曲の検索時に MyAnimeList、Anison Generation、Mora へリクエストを送ります。MyAnimeList への追加リクエストは一覧ページで「A」を押した作品にだけ送られます。表示言語を含む表示設定はブラウザの `localStorage` に保存されます。
 
 ## 制限事項
 

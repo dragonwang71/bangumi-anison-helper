@@ -3,10 +3,10 @@
 // @name:ja      Bangumi Anison Helper - アニメ主題歌検索
 // @name:en      Bangumi Anison Helper - Anime Theme Song Search
 // @namespace    https://github.com/dragonwang71/bangumi-anison-helper
-// @version      1.1.1
-// @description  Bangumi・Annictの作品ページにアニメ主題歌情報を表示し、Mora試聴とYouTube検索を追加します。
-// @description:ja Bangumi・Annictの作品ページにアニメ主題歌情報を表示し、Mora試聴とYouTube検索を追加します。
-// @description:en Show anime opening and ending songs on Bangumi and Annict with Mora previews and YouTube search.
+// @version      1.1.2
+// @description  Bangumi・Annict・MyAnimeListの作品ページにアニメ主題歌情報を表示し、Mora試聴とYouTube検索を追加します。
+// @description:ja Bangumi・Annict・MyAnimeListの作品ページにアニメ主題歌情報を表示し、Mora試聴とYouTube検索を追加します。
+// @description:en Show anime opening and ending songs on Bangumi, Annict, and MyAnimeList with Mora previews and YouTube search.
 // @homepageURL  https://github.com/dragonwang71/bangumi-anison-helper
 // @supportURL   https://github.com/dragonwang71/bangumi-anison-helper/issues
 // @updateURL    https://raw.githubusercontent.com/dragonwang71/bangumi-anison-helper/main/bangumi-anison-helper.user.js
@@ -15,8 +15,11 @@
 // @match        http://bangumi.tv/*
 // @match        https://annict.com/*
 // @match        http://annict.com/*
+// @match        https://myanimelist.net/*
+// @match        http://myanimelist.net/*
 // @grant        GM_xmlhttpRequest
 // @connect      anison.info
+// @connect      myanimelist.net
 // @connect      mora.jp
 // @license      MIT
 // ==/UserScript==
@@ -27,6 +30,7 @@
   const moraCache = new Map();
   const moraInlineCache = new Map();
   const moraListenUrlCache = new Map();
+  const myAnimeListTitleCache = new Map();
   const PREVIEW_MODE_KEY = 'anison_preview_mode';
   const AUTO_MORA_INLINE_KEY = 'anison_auto_mora_inline';
   const UI_LANGUAGE_KEY = 'anison_ui_language';
@@ -69,7 +73,9 @@
       language: '表示言語',
       languageHint: 'Bangumi Anison Helper の表示言語',
       opening: '展開中',
-      working: '処理中'
+      working: '処理中',
+      malTitleLoading: 'MyAnimeList のタイトルを読み込み中…',
+      malTitleUnavailable: '検索に使える MyAnimeList のタイトルが見つかりません'
     },
     en: {
       autoMoraOn: 'Mora auto: on',
@@ -107,7 +113,9 @@
       language: 'Language',
       languageHint: 'Bangumi Anison Helper display language',
       opening: 'Opening',
-      working: 'Working'
+      working: 'Working',
+      malTitleLoading: 'Loading the title from MyAnimeList…',
+      malTitleUnavailable: 'No MyAnimeList title is available for search'
     }
   };
   let previewMode = PREVIEW_MODES.WINDOW;
@@ -1549,7 +1557,7 @@
     panelParts.searchBtn.textContent = searching ? '...' : '⌕';
   }
 
-  function renderAnisonForTitle(title, mainArea, detailArea, onSuccess, panelParts) {
+  function renderAnisonForTitle(title, mainArea, detailArea, onSuccess, panelParts, onFailure) {
     const query = cleanText(title);
     let searchToken = null;
     if (panelParts) {
@@ -1599,16 +1607,20 @@
       }
     }, function () {
       if (!isCurrentSearch()) return;
+      if (onFailure) {
+        onFailure();
+        return;
+      }
       setResultPanelSearching(panelParts, false);
       setLocalizedText(mainArea, 'noTableData');
     });
   }
 
-  function performPanelSearch(panelParts, title, onSuccess) {
+  function performPanelSearch(panelParts, title, onSuccess, onFailure) {
     const query = cleanText(title);
     if (!panelParts || !panelParts.mainArea || !panelParts.detailArea) return;
     if (panelParts.panel) panelParts.panel.style.display = 'block';
-    renderAnisonForTitle(query, panelParts.mainArea, panelParts.detailArea, onSuccess, panelParts);
+    renderAnisonForTitle(query, panelParts.mainArea, panelParts.detailArea, onSuccess, panelParts, onFailure);
   }
 
   function createResultPanel(anchor, mode) {
@@ -2011,9 +2023,326 @@
     return true;
   }
 
+  function isMyAnimeListHost() {
+    const host = location.hostname;
+    return host === 'myanimelist.net' || host.endsWith('.myanimelist.net');
+  }
+
+  function getMyAnimeListAnimeIdFromHref(href) {
+    const match = String(href || '').match(
+      /^(?:https?:\/\/(?:www\.)?myanimelist\.net)?\/anime\/(\d+)(?:[\/?#]|$)/i
+    );
+    return match ? match[1] : '';
+  }
+
+  function getMyAnimeListLabeledTitle(doc, label) {
+    if (!doc || !doc.querySelectorAll) return '';
+    const target = cleanText(label).replace(/:$/, '').toLowerCase();
+    const labels = doc.querySelectorAll('.spaceit_pad .dark_text');
+
+    for (const labelNode of labels) {
+      const labelText = cleanText(labelNode.textContent || '');
+      if (labelText.replace(/:$/, '').toLowerCase() !== target) continue;
+
+      const container = labelNode.closest('.spaceit_pad') || labelNode.parentElement;
+      const fullText = cleanText(container ? container.textContent : '');
+      if (!fullText) return '';
+      if (fullText.startsWith(labelText)) {
+        return cleanText(fullText.slice(labelText.length));
+      }
+      return cleanText(fullText.replace(labelText, ''));
+    }
+
+    return '';
+  }
+
+  function getMyAnimeListTitleCandidatesFromDocument(doc, fallbackTitle) {
+    const japaneseTitle = getMyAnimeListLabeledTitle(doc, 'Japanese');
+    const englishTitle = getMyAnimeListLabeledTitle(doc, 'English');
+    const primaryNode = doc && doc.querySelector
+      ? doc.querySelector('h1.title-name, h1.title-name strong')
+      : null;
+    const primaryTitle = cleanText(primaryNode ? primaryNode.textContent : '');
+    return Array.from(new Set(
+      [japaneseTitle, englishTitle, primaryTitle, fallbackTitle]
+        .map(cleanText)
+        .filter(Boolean)
+    ));
+  }
+
+  function loadMyAnimeListTitleCandidates(animeId, fallbackTitle, sourceDoc, onDone) {
+    const directCandidates = getMyAnimeListTitleCandidatesFromDocument(sourceDoc, fallbackTitle);
+    const hasPreferredDirectTitle =
+      !!getMyAnimeListLabeledTitle(sourceDoc, 'Japanese') ||
+      !!getMyAnimeListLabeledTitle(sourceDoc, 'English');
+
+    if (hasPreferredDirectTitle) {
+      myAnimeListTitleCache.set(animeId, directCandidates);
+      onDone(directCandidates);
+      return;
+    }
+
+    if (myAnimeListTitleCache.has(animeId)) {
+      const cached = myAnimeListTitleCache.get(animeId) || [];
+      onDone(Array.from(new Set(cached.concat(directCandidates))));
+      return;
+    }
+
+    GM_xmlhttpRequest({
+      method: 'GET',
+      url: `https://myanimelist.net/anime/${encodeURIComponent(animeId)}`,
+      onload: function (resp) {
+        let candidates = directCandidates;
+        try {
+          if (!resp.status || (resp.status >= 200 && resp.status < 400)) {
+            const doc = new DOMParser().parseFromString(resp.responseText, 'text/html');
+            candidates = getMyAnimeListTitleCandidatesFromDocument(doc, fallbackTitle);
+          }
+        } catch (e) {}
+        myAnimeListTitleCache.set(animeId, candidates);
+        onDone(candidates);
+      },
+      onerror: function () {
+        onDone(directCandidates);
+      }
+    });
+  }
+
+  function performMyAnimeListPanelSearch(panelParts, candidates, onSuccess) {
+    const queries = Array.from(new Set((candidates || []).map(cleanText).filter(Boolean)));
+    let index = 0;
+
+    function searchNext() {
+      if (index >= queries.length) {
+        setResultPanelSearching(panelParts, false);
+        setLocalizedText(panelParts.mainArea, 'malTitleUnavailable');
+        return;
+      }
+
+      const query = queries[index++];
+      const hasFallback = index < queries.length;
+      performPanelSearch(
+        panelParts,
+        query,
+        onSuccess,
+        hasFallback ? searchNext : null
+      );
+    }
+
+    searchNext();
+  }
+
+  function prepareMyAnimeListSearch(panelParts) {
+    panelParts.panel.style.display = 'block';
+    panelParts.malRequestToken = (panelParts.malRequestToken || 0) + 1;
+    setResultPanelSearching(panelParts, true);
+    setLocalizedText(panelParts.mainArea, 'malTitleLoading');
+    clearLocalizedText(panelParts.detailArea);
+    panelParts.detailArea.innerHTML = '';
+    return panelParts.malRequestToken;
+  }
+
+  function bindMyAnimeListSearchButton(btn, panelParts, sourceDoc, toggleAfterLoad) {
+    let loaded = false;
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (toggleAfterLoad && loaded) {
+        panelParts.panel.style.display = panelParts.panel.style.display === 'none' ? 'block' : 'none';
+        return;
+      }
+
+      flashButtonText(btn, uiText('loadingShort'), 550);
+      const requestToken = prepareMyAnimeListSearch(panelParts);
+      loadMyAnimeListTitleCandidates(
+        btn.dataset.malAnimeId,
+        btn.dataset.malAnimeTitle,
+        sourceDoc,
+        function (candidates) {
+          if (panelParts.malRequestToken !== requestToken) return;
+          performMyAnimeListPanelSearch(panelParts, candidates, function () {
+            loaded = true;
+          });
+        }
+      );
+    });
+  }
+
+  function createMyAnimeListListButton(anchor, panelParts) {
+    const animeId = getMyAnimeListAnimeIdFromHref(anchor.getAttribute('href') || '');
+    const titleText = cleanText(anchor.textContent || anchor.getAttribute('title') || '');
+    if (!animeId || !titleText) return null;
+
+    const btn = document.createElement('a');
+    btn.href = '#';
+    btn.className = 'anison-item-btn-mal';
+    btn.textContent = 'A';
+    btn.title = `Anison: ${titleText}`;
+    btn.setAttribute('aria-label', `Anison: ${titleText}`);
+    btn.dataset.malAnimeId = animeId;
+    btn.dataset.malAnimeTitle = titleText;
+    btn.style.cssText = [
+      'display:inline-block',
+      'margin:0 4px 0 0',
+      'padding:0 4px',
+      'font-size:11px',
+      'line-height:14px',
+      'border:1px solid #555',
+      'border-radius:3px',
+      'text-decoration:none',
+      'background:#1e1e1e',
+      'color:#fff',
+      'cursor:pointer',
+      'vertical-align:middle',
+      'flex:0 0 auto'
+    ].join(';');
+    applyButtonFeedback(btn);
+    bindMyAnimeListSearchButton(btn, panelParts, null, false);
+    return btn;
+  }
+
+  function createMyAnimeListDetailButton(animeId, titleText, panelParts) {
+    const btn = document.createElement('a');
+    btn.href = '#';
+    btn.className = 'anison-jump-btn anison-mal-detail-btn';
+    btn.textContent = 'Anison';
+    btn.title = `Anison: ${titleText}`;
+    btn.dataset.malAnimeId = animeId;
+    btn.dataset.malAnimeTitle = titleText;
+    btn.style.cssText = [
+      'display:inline-block',
+      'padding:2px 8px',
+      'font-size:12px',
+      'line-height:18px',
+      'border:1px solid #aaa',
+      'border-radius:4px',
+      'text-decoration:none',
+      'color:#333',
+      'background:#f5f5f5',
+      'cursor:pointer',
+      'flex:0 0 auto',
+      'margin-top:2px'
+    ].join(';');
+    btn.addEventListener('mouseenter', function () {
+      btn.style.background = '#ececec';
+    });
+    btn.addEventListener('mouseleave', function () {
+      btn.style.background = '#f5f5f5';
+    });
+    applyButtonFeedback(btn);
+    bindMyAnimeListSearchButton(btn, panelParts, document, true);
+    return btn;
+  }
+
+  function getMyAnimeListPanelAnchor(detailTitleRow) {
+    if (detailTitleRow) return detailTitleRow;
+    const wrapper = document.querySelector('#contentWrapper');
+    if (wrapper) {
+      return (
+        wrapper.querySelector(':scope > .h1') ||
+        wrapper.querySelector(':scope > div:first-child') ||
+        wrapper.querySelector('h1')
+      );
+    }
+    const heading = document.querySelector('h1.title-name, h1');
+    return heading ? (heading.parentElement || heading) : null;
+  }
+
+  function getMyAnimeListPanelParts(anchor) {
+    let panel = document.querySelector('.anison-result-panel.mal-page-mode');
+    let panelParts;
+    if (panel) {
+      if (panel.previousElementSibling !== anchor) {
+        anchor.insertAdjacentElement('afterend', panel);
+      }
+      panelParts = getResultPanelParts(panel);
+    } else {
+      panelParts = createResultPanel(anchor, 'after');
+      panel = panelParts.panel;
+      panel.classList.add('mal-page-mode');
+      panel.style.background = '#2e3035';
+      panel.style.borderRadius = '4px';
+    }
+    return panelParts;
+  }
+
+  function setupMyAnimeListPage() {
+    if (!isMyAnimeListHost()) return false;
+
+    let injected = false;
+    const detailMatch = location.pathname.match(/^\/anime\/(\d+)(?:\/[^\/]+)?\/?$/);
+    const detailTitleRow = detailMatch ? document.querySelector('div.h1.edit-info') : null;
+    const panelAnchor = getMyAnimeListPanelAnchor(detailTitleRow);
+    if (!panelAnchor) return false;
+    const panelParts = getMyAnimeListPanelParts(panelAnchor);
+
+    if (detailMatch) {
+      const titleRow = detailTitleRow;
+      const titleArea = titleRow ? titleRow.querySelector(':scope > .h1-title') : null;
+      const titleNode = titleArea ? titleArea.querySelector('h1.title-name') : null;
+      const titleText = cleanText(titleNode ? titleNode.textContent : '');
+      if (
+        titleRow &&
+        titleArea &&
+        titleText &&
+        !titleRow.querySelector(':scope > .anison-mal-detail-btn')
+      ) {
+        titleRow.style.display = 'flex';
+        titleRow.style.alignItems = 'flex-start';
+        titleRow.style.gap = '8px';
+        titleArea.style.flex = '1 1 auto';
+        titleArea.style.minWidth = '0';
+
+        const btn = createMyAnimeListDetailButton(detailMatch[1], titleText, panelParts);
+        const headerRight = titleRow.querySelector(':scope > .header-right');
+        titleRow.insertBefore(btn, headerRight || null);
+        injected = true;
+      }
+    }
+
+    const largeTitleAnchors = document.querySelectorAll(
+      '.seasonal-anime .title-text h2.h2_anime_title > a.link-title[href*="/anime/"]'
+    );
+    largeTitleAnchors.forEach(function (anchor) {
+      const titleRow = anchor.closest('.title-text');
+      const heading = anchor.closest('h2.h2_anime_title');
+      if (!titleRow || !heading || titleRow.querySelector(':scope > .anison-item-btn-mal')) return;
+
+      const btn = createMyAnimeListListButton(anchor, panelParts);
+      if (!btn) return;
+      btn.style.marginTop = '2px';
+      titleRow.style.display = 'flex';
+      titleRow.style.alignItems = 'flex-start';
+      titleRow.style.gap = '3px';
+      heading.style.flex = '1 1 auto';
+      heading.style.minWidth = '0';
+      titleRow.insertBefore(btn, heading);
+      injected = true;
+    });
+
+    const compactTitleAnchors = document.querySelectorAll(
+      'a.hoverinfo_trigger.fw-b[href*="/anime/"]'
+    );
+    compactTitleAnchors.forEach(function (anchor) {
+      const titleCell = anchor.parentElement;
+      if (!titleCell || titleCell.querySelector(':scope > .anison-item-btn-mal')) return;
+
+      const btn = createMyAnimeListListButton(anchor, panelParts);
+      if (!btn) return;
+      titleCell.insertBefore(btn, anchor);
+      injected = true;
+    });
+
+    return injected;
+  }
+
   function isSupportedEntryPointRoute() {
     const host = location.hostname;
     const path = location.pathname;
+    if (host === 'myanimelist.net' || host.endsWith('.myanimelist.net')) {
+      return /^\/anime(?:\.php|\/|$)/.test(path);
+    }
     if (host === 'annict.com' || host.endsWith('.annict.com')) {
       return /^\/works(?:\/|$)/.test(path);
     }
@@ -2031,6 +2360,7 @@
     setupSubjectOrWorkPage();
     setupBangumiAnimeListPage();
     setupAnnictWorksListPage();
+    setupMyAnimeListPage();
     refreshPreviewModeToggles();
     refreshAutoMoraInlineToggles();
   }
