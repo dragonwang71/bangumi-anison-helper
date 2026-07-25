@@ -2,11 +2,13 @@
 // @name         Bangumi Anison Helper - アニメ主題歌検索
 // @name:ja      Bangumi Anison Helper - アニメ主題歌検索
 // @name:en      Bangumi Anison Helper - Anime Theme Song Search
+// @name:zh-CN   Bangumi Anison Helper - 动画主题曲搜索
 // @namespace    https://github.com/dragonwang71/bangumi-anison-helper
-// @version      1.1.2
+// @version      1.1.3
 // @description  Bangumi・Annict・MyAnimeListの作品ページにアニメ主題歌情報を表示し、Mora試聴とYouTube検索を追加します。
 // @description:ja Bangumi・Annict・MyAnimeListの作品ページにアニメ主題歌情報を表示し、Mora試聴とYouTube検索を追加します。
 // @description:en Show anime opening and ending songs on Bangumi, Annict, and MyAnimeList with Mora previews and YouTube search.
+// @description:zh-CN 在 Bangumi、Annict 和 MyAnimeList 页面显示动画主题曲信息，并提供 Mora 试听和 YouTube 搜索。
 // @homepageURL  https://github.com/dragonwang71/bangumi-anison-helper
 // @supportURL   https://github.com/dragonwang71/bangumi-anison-helper/issues
 // @updateURL    https://raw.githubusercontent.com/dragonwang71/bangumi-anison-helper/main/bangumi-anison-helper.user.js
@@ -116,6 +118,46 @@
       working: 'Working',
       malTitleLoading: 'Loading the title from MyAnimeList…',
       malTitleUnavailable: 'No MyAnimeList title is available for search'
+    },
+    'zh-CN': {
+      autoMoraOn: 'Mora 自动：开',
+      autoMoraOff: 'Mora 自动：关',
+      disableAutoMora: '点击关闭曲目表的 Mora 自动搜索',
+      enableAutoMora: '点击开启曲目表的 Mora 自动搜索',
+      previewWindow: '小窗',
+      previewNewTab: '新标签',
+      previewWindowTitle: '当前：复用同一个小窗（点击切换到新标签）',
+      previewNewTabTitle: '当前：每次打开新标签（点击切换到小窗）',
+      pausePreview: '暂停试听',
+      playPreview: '试听',
+      moraPreview: '在 Mora 试听',
+      moraSearching: '正在搜索 Mora…',
+      moraNotFound: '未找到',
+      copy: '复制',
+      copied: '已复制',
+      searching: '搜索中…',
+      opened: '已打开',
+      tracks: '曲目',
+      loadingShort: '加载中',
+      actionsHeader: '试听与搜索',
+      loadingTracks: '正在加载曲目…',
+      detailTableNotFound: '未找到曲目表',
+      detailTableParseFailed: '无法解析曲目表',
+      detailParseFailed: '无法解析曲目数据',
+      detailLoadFailed: '无法加载曲目',
+      enterSearchKeyword: '请输入搜索关键词',
+      loading: '加载中…',
+      parseFailed: '无法解析数据',
+      noTableData: '未找到表格数据（已尝试其他规范化标题）',
+      searchPlaceholder: '搜索 anison.info',
+      searchHint: '可以编辑关键词后重新搜索',
+      search: '搜索',
+      language: '显示语言',
+      languageHint: 'Bangumi Anison Helper 的显示语言',
+      opening: '展开中',
+      working: '处理中',
+      malTitleLoading: '正在读取 MyAnimeList 标题…',
+      malTitleUnavailable: '未找到可用于搜索的 MyAnimeList 标题'
     }
   };
   let previewMode = PREVIEW_MODES.WINDOW;
@@ -156,7 +198,8 @@
   }
 
   function resolveUiLanguage(saved) {
-    return saved === 'en' ? 'en' : 'ja';
+    if (saved === 'en' || saved === 'zh-CN') return saved;
+    return 'ja';
   }
 
   function getUiLanguage() {
@@ -1690,7 +1733,8 @@
     setLocalizedAttribute(languageSelect, 'title', 'languageHint');
     [
       { value: 'ja', label: '日本語' },
-      { value: 'en', label: 'English' }
+      { value: 'en', label: 'English' },
+      { value: 'zh-CN', label: '中文' }
     ].forEach(function (item) {
       const option = document.createElement('option');
       option.value = item.value;
