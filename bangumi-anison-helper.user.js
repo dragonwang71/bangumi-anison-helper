@@ -1,12 +1,12 @@
 // ==UserScript==
-// @name         Bangumi Anison Helper
+// @name         Bangumi Anison Helper - アニメ主題歌検索
 // @name:ja      Bangumi Anison Helper - アニメ主題歌検索
-// @name:zh-CN   Bangumi Anison Helper - 动画歌曲查询
+// @name:en      Bangumi Anison Helper - Anime Theme Song Search
 // @namespace    https://github.com/dragonwang71/bangumi-anison-helper
-// @version      1.0.0
-// @description  Show anime opening and ending songs on Bangumi and Annict with Mora previews and YouTube search.
+// @version      1.1.0
+// @description  Bangumi・Annictの作品ページにアニメ主題歌情報を表示し、Mora試聴とYouTube検索を追加します。
 // @description:ja Bangumi・Annictの作品ページにアニメ主題歌情報を表示し、Mora試聴とYouTube検索を追加します。
-// @description:zh-CN 在 Bangumi 和 Annict 作品页显示动画 OP/ED 信息，并提供 Mora 试听与 YouTube 搜索。
+// @description:en Show anime opening and ending songs on Bangumi and Annict with Mora previews and YouTube search.
 // @homepageURL  https://github.com/dragonwang71/bangumi-anison-helper
 // @supportURL   https://github.com/dragonwang71/bangumi-anison-helper/issues
 // @updateURL    https://raw.githubusercontent.com/dragonwang71/bangumi-anison-helper/main/bangumi-anison-helper.user.js
@@ -33,10 +33,90 @@
   const moraListenUrlCache = new Map();
   const PREVIEW_MODE_KEY = 'anison_preview_mode';
   const AUTO_MORA_INLINE_KEY = 'anison_auto_mora_inline';
+  const UI_LANGUAGE_KEY = 'anison_ui_language';
   const PREVIEW_MODES = { WINDOW: 'window', NEWTAB: 'newtab' };
   const PREVIEW_WINDOW_NAME = 'anison_preview_window';
+  const UI_TEXT = {
+    ja: {
+      autoMoraOn: 'Mora自動：オン',
+      autoMoraOff: 'Mora自動：オフ',
+      disableAutoMora: 'クリックすると、曲目のMora自動検索をオフにします',
+      enableAutoMora: 'クリックすると、曲目のMora自動検索をオンにします',
+      previewWindow: '小窓',
+      previewNewTab: '新規タブ',
+      previewWindowTitle: '現在：同じ小窓で開く（クリックで新規タブに切り替え）',
+      previewNewTabTitle: '現在：新しいタブで開く（クリックで小窓に切り替え）',
+      pausePreview: '試聴を一時停止',
+      playPreview: '試聴する',
+      moraPreview: 'Moraで試聴',
+      moraSearching: 'Moraを検索中…',
+      moraNotFound: '見つかりません',
+      copy: 'コピー',
+      copied: 'コピー済み',
+      searching: '検索中…',
+      opened: '開きました',
+      tracks: '曲目',
+      loadingShort: '読込中',
+      actionsHeader: '試聴・検索',
+      loadingTracks: '曲目を読み込み中…',
+      detailTableNotFound: '曲目表が見つかりません',
+      detailTableParseFailed: '曲目表を解析できませんでした',
+      detailParseFailed: '曲目データを解析できませんでした',
+      detailLoadFailed: '曲目を読み込めませんでした',
+      enterSearchKeyword: '検索キーワードを入力してください',
+      loading: '読み込み中…',
+      parseFailed: 'データを解析できませんでした',
+      noTableData: '表データが見つかりません（表記を変えた候補も検索しました）',
+      searchPlaceholder: 'anison.info を検索',
+      searchHint: 'キーワードを編集して検索できます',
+      search: '検索',
+      language: '表示言語',
+      languageHint: 'Bangumi Anison Helper の表示言語',
+      opening: '展開中',
+      working: '処理中'
+    },
+    en: {
+      autoMoraOn: 'Mora auto: on',
+      autoMoraOff: 'Mora auto: off',
+      disableAutoMora: 'Turn off automatic Mora search for track lists',
+      enableAutoMora: 'Turn on automatic Mora search for track lists',
+      previewWindow: 'Window',
+      previewNewTab: 'New tab',
+      previewWindowTitle: 'Current: reuse one preview window (click for new tabs)',
+      previewNewTabTitle: 'Current: open a new tab each time (click for one preview window)',
+      pausePreview: 'Pause preview',
+      playPreview: 'Play preview',
+      moraPreview: 'Preview on Mora',
+      moraSearching: 'Searching Mora…',
+      moraNotFound: 'Not found',
+      copy: 'Copy',
+      copied: 'Copied',
+      searching: 'Searching…',
+      opened: 'Opened',
+      tracks: 'Tracks',
+      loadingShort: 'Loading',
+      actionsHeader: 'Preview & search',
+      loadingTracks: 'Loading tracks…',
+      detailTableNotFound: 'Track table not found',
+      detailTableParseFailed: 'Could not parse the track table',
+      detailParseFailed: 'Could not parse track data',
+      detailLoadFailed: 'Could not load tracks',
+      enterSearchKeyword: 'Enter a search keyword',
+      loading: 'Loading…',
+      parseFailed: 'Could not parse the data',
+      noTableData: 'No table data found after trying normalized search terms',
+      searchPlaceholder: 'Search anison.info',
+      searchHint: 'Edit the keyword, then search again',
+      search: 'Search',
+      language: 'Language',
+      languageHint: 'Bangumi Anison Helper display language',
+      opening: 'Opening',
+      working: 'Working'
+    }
+  };
   let previewMode = PREVIEW_MODES.WINDOW;
   let autoMoraInlineEnabled = true;
+  let uiLanguage = 'ja';
   let previewWindowRef = null;
   let inlineMoraAudio = null;
   let inlineMoraNowPlayingBtn = null;
@@ -69,6 +149,73 @@
     setTimeout(function () {
       el.textContent = oldText;
     }, ms || 700);
+  }
+
+  function resolveUiLanguage(saved) {
+    return saved === 'en' ? 'en' : 'ja';
+  }
+
+  function getUiLanguage() {
+    try {
+      return resolveUiLanguage(localStorage.getItem(UI_LANGUAGE_KEY));
+    } catch (e) {}
+    return 'ja';
+  }
+
+  function uiText(key) {
+    return (UI_TEXT[uiLanguage] && UI_TEXT[uiLanguage][key]) || UI_TEXT.ja[key] || key;
+  }
+
+  function setLocalizedText(el, key) {
+    if (!el) return;
+    el.dataset.anisonI18n = key;
+    el.textContent = uiText(key);
+  }
+
+  function clearLocalizedText(el) {
+    if (!el) return;
+    delete el.dataset.anisonI18n;
+  }
+
+  function setLocalizedAttribute(el, attribute, key) {
+    if (!el) return;
+    el.dataset[`anisonI18n${attribute.replace(/(^|-)([a-z])/g, function (_, __, letter) {
+      return letter.toUpperCase();
+    })}`] = key;
+    el.setAttribute(attribute, uiText(key));
+  }
+
+  function refreshLocalizedUi() {
+    document.querySelectorAll('[data-anison-i18n]').forEach(function (el) {
+      el.textContent = uiText(el.dataset.anisonI18n);
+    });
+    [
+      { attribute: 'title', datasetKey: 'anisonI18nTitle' },
+      { attribute: 'placeholder', datasetKey: 'anisonI18nPlaceholder' },
+      { attribute: 'aria-label', datasetKey: 'anisonI18nAriaLabel' }
+    ].forEach(function (item) {
+      document.querySelectorAll(`[data-${item.datasetKey.replace(/[A-Z]/g, function (letter) {
+        return `-${letter.toLowerCase()}`;
+      })}]`).forEach(function (el) {
+        el.setAttribute(item.attribute, uiText(el.dataset[item.datasetKey]));
+      });
+    });
+    document.querySelectorAll('.anison-language-select').forEach(function (select) {
+      select.value = uiLanguage;
+    });
+    document.querySelectorAll('.anison-inline-mora button[data-state]').forEach(function (btn) {
+      setInlineMoraPlayBtnState(btn, btn.dataset.state);
+    });
+    refreshPreviewModeToggles();
+    refreshAutoMoraInlineToggles();
+  }
+
+  function setUiLanguage(language) {
+    uiLanguage = resolveUiLanguage(language);
+    try {
+      localStorage.setItem(UI_LANGUAGE_KEY, uiLanguage);
+    } catch (e) {}
+    refreshLocalizedUi();
   }
 
   function getPreviewMode() {
@@ -110,16 +257,16 @@
 
   function refreshAutoMoraInlineToggles() {
     document.querySelectorAll('.anison-auto-mora-toggle').forEach(function (btn) {
-      btn.textContent = autoMoraInlineEnabled ? 'mora自动:开' : 'mora自动:关';
-      btn.title = autoMoraInlineEnabled ? '点击关闭：曲目页不自动搜索mora' : '点击开启：曲目页自动搜索mora';
+      setLocalizedText(btn, autoMoraInlineEnabled ? 'autoMoraOn' : 'autoMoraOff');
+      setLocalizedAttribute(btn, 'title', autoMoraInlineEnabled ? 'disableAutoMora' : 'enableAutoMora');
       btn.style.opacity = autoMoraInlineEnabled ? '1' : '0.75';
     });
   }
 
   function refreshPreviewModeToggles() {
     document.querySelectorAll('.anison-preview-mode-toggle').forEach(function (btn) {
-      btn.textContent = previewMode === PREVIEW_MODES.WINDOW ? '新窗' : '新页';
-      btn.title = previewMode === PREVIEW_MODES.WINDOW ? '当前模式：固定新窗口（点击切到新页）' : '当前模式：每次新页面（点击切到固定新窗口）';
+      setLocalizedText(btn, previewMode === PREVIEW_MODES.WINDOW ? 'previewWindow' : 'previewNewTab');
+      setLocalizedAttribute(btn, 'title', previewMode === PREVIEW_MODES.WINDOW ? 'previewWindowTitle' : 'previewNewTabTitle');
       btn.style.opacity = previewMode === PREVIEW_MODES.WINDOW ? '1' : '0.85';
     });
   }
@@ -504,7 +651,7 @@
     const isPauseLike = s === 'pause' || s === 'loading';
     btn.dataset.state = s;
     btn.disabled = s === 'loading';
-    btn.title = s === 'pause' ? '点击暂停' : '点击试听';
+    btn.title = uiText(s === 'pause' ? 'pausePreview' : 'playPreview');
     btn.style.backgroundImage = `url("${isPauseLike ? MORA_INLINE_PAUSE_ICON : MORA_INLINE_PLAY_ICON}")`;
     btn.style.backgroundRepeat = 'no-repeat';
     btn.style.backgroundPosition = isPauseLike ? 'center center' : 'center top';
@@ -575,12 +722,12 @@
     }, onFail);
   }
 
-  function setInlineMoraStatus(cell, text, tone) {
+  function setInlineMoraStatus(cell, textKey, tone) {
     if (!cell) return;
     cell.innerHTML = '';
     const tip = document.createElement('span');
     tip.className = 'anison-inline-mora-tip';
-    tip.textContent = text || '';
+    setLocalizedText(tip, textKey);
     tip.style.cssText = [
       'display:inline-block',
       'font-size:11px',
@@ -594,7 +741,10 @@
   }
 
   function stripUiNoise(text) {
-    return cleanText((text || '').replace(/\b复制\b/g, ' ').replace(/已复制/g, ' '));
+    return cleanText(
+      (text || '')
+        .replace(/コピー済み|コピー|\bCopied\b|\bCopy\b/gi, ' ')
+    );
   }
 
   function createInlineMoraWidget(targetCell, item) {
@@ -625,8 +775,8 @@
 
     const playBtn = document.createElement('button');
     playBtn.type = 'button';
-    playBtn.setAttribute('aria-label', 'mora试听');
-    playBtn.title = item.title ? `mora: ${item.title}` : 'mora试听';
+    setLocalizedAttribute(playBtn, 'aria-label', 'moraPreview');
+    playBtn.title = item.title ? `Mora: ${item.title}` : uiText('moraPreview');
     playBtn.style.cssText = [
       'width:26px',
       'height:26px',
@@ -701,7 +851,7 @@
       inlineCell.style.whiteSpace = 'nowrap';
       inlineCell.style.minWidth = '96px';
       inlineCell.style.textAlign = 'right';
-      setInlineMoraStatus(inlineCell, '搜mora中...', 'loading');
+      setInlineMoraStatus(inlineCell, 'moraSearching', 'loading');
 
       const songText = cleanText(songCell.textContent);
       const vocalText = getCellTextByLine(vocalCell, '  ');
@@ -714,11 +864,11 @@
           if (item) {
             createInlineMoraWidget(inlineCell, item);
           } else {
-            setInlineMoraStatus(inlineCell, '未找到', 'error');
+            setInlineMoraStatus(inlineCell, 'moraNotFound', 'error');
           }
           done();
         }, function () {
-          setInlineMoraStatus(inlineCell, '未找到', 'error');
+          setInlineMoraStatus(inlineCell, 'moraNotFound', 'error');
           done();
         });
       });
@@ -932,7 +1082,8 @@
 
     const copyBtn = document.createElement('button');
     copyBtn.type = 'button';
-    copyBtn.textContent = '复制';
+    copyBtn.className = 'anison-copy-btn';
+    setLocalizedText(copyBtn, 'copy');
     copyBtn.style.cssText = [
       'margin-left:8px',
       'padding:1px 6px',
@@ -949,7 +1100,7 @@
       e.preventDefault();
       e.stopPropagation();
       copyText(textGetter());
-      flashButtonText(copyBtn, '已复制', 800);
+      flashButtonText(copyBtn, uiText('copied'), 800);
     });
     applyButtonFeedback(copyBtn);
 
@@ -1077,13 +1228,14 @@
   function handlePreviewAction(provider, songText, vocalText, triggerBtn) {
     const isMora = provider === 'mora';
     if (isMora) {
-      triggerBtn.textContent = '搜索中...';
+      setLocalizedText(triggerBtn, 'searching');
       triggerBtn.disabled = true;
     }
 
     function restoreBtn() {
       if (!isMora) return;
-      triggerBtn.textContent = 'mora';
+      clearLocalizedText(triggerBtn);
+      triggerBtn.textContent = 'Mora';
       triggerBtn.disabled = false;
     }
 
@@ -1091,10 +1243,10 @@
       const mode = getPreviewMode();
       if (mode === PREVIEW_MODES.NEWTAB) {
         if (target.url) window.open(target.url, '_blank');
-        flashButtonText(triggerBtn, '已打开', 700);
+        flashButtonText(triggerBtn, uiText('opened'), 700);
       } else {
         if (target.url) openInReusableWindow(target.url);
-        flashButtonText(triggerBtn, '已打开', 700);
+        flashButtonText(triggerBtn, uiText('opened'), 700);
       }
     }
 
@@ -1132,7 +1284,7 @@
       e.stopPropagation();
       const next = previewMode === PREVIEW_MODES.WINDOW ? PREVIEW_MODES.NEWTAB : PREVIEW_MODES.WINDOW;
       setPreviewMode(next);
-      flashButtonText(toggleBtn, next === PREVIEW_MODES.WINDOW ? '新窗' : '新页', 650);
+      flashButtonText(toggleBtn, uiText(next === PREVIEW_MODES.WINDOW ? 'previewWindow' : 'previewNewTab'), 650);
     });
     applyButtonFeedback(toggleBtn);
     actionTh.appendChild(toggleBtn);
@@ -1252,7 +1404,7 @@
         e.preventDefault();
         e.stopPropagation();
         setAutoMoraInlineEnabled(!autoMoraInlineEnabled);
-        flashButtonText(autoBtn, autoMoraInlineEnabled ? 'mora自动:开' : 'mora自动:关', 650);
+        flashButtonText(autoBtn, uiText(autoMoraInlineEnabled ? 'autoMoraOn' : 'autoMoraOff'), 650);
       });
       applyButtonFeedback(autoBtn);
       programTh.appendChild(autoBtn);
@@ -1266,7 +1418,8 @@
       const programTitle = cleanText(a.textContent || (rightCell ? rightCell.textContent : ''));
       const detailBtn = document.createElement('button');
       detailBtn.type = 'button';
-      detailBtn.textContent = '曲目';
+      detailBtn.className = 'anison-detail-btn';
+      setLocalizedText(detailBtn, 'tracks');
       detailBtn.style.cssText = [
         'margin-left:8px',
         'padding:1px 6px',
@@ -1283,7 +1436,7 @@
       detailBtn.addEventListener('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
-        flashButtonText(detailBtn, '加载中', 600);
+        flashButtonText(detailBtn, uiText('loadingShort'), 600);
         loadDetailTable(a.href, detailArea);
       });
       applyButtonFeedback(detailBtn);
@@ -1320,10 +1473,12 @@
         header.textContent = '';
         header.style.width = '86px';
         header.style.minWidth = '86px';
+      } else if (id === 'actions') {
+        const label = document.createElement('span');
+        setLocalizedText(label, 'actionsHeader');
+        header.appendChild(label);
       } else {
-        header.textContent = id === 'actions'
-          ? '試聴・検索'
-          : (sourceHeader ? sourceHeader.textContent.trim() : id);
+        header.textContent = sourceHeader ? sourceHeader.textContent.trim() : id;
       }
       headerRow.appendChild(header);
     });
@@ -1360,7 +1515,7 @@
   }
 
   function loadDetailTable(programUrl, detailArea) {
-    detailArea.textContent = '加载曲目中...';
+    setLocalizedText(detailArea, 'loadingTracks');
     GM_xmlhttpRequest({
       method: 'GET',
       url: programUrl,
@@ -1369,24 +1524,25 @@
           const doc = new DOMParser().parseFromString(resp.responseText, 'text/html');
           const srcTable = doc.querySelector('table.sorted');
           if (!srcTable) {
-            detailArea.textContent = '未找到曲目表格';
+            setLocalizedText(detailArea, 'detailTableNotFound');
             return;
           }
 
           const detailTable = buildDetailTable(srcTable);
           if (!detailTable) {
-            detailArea.textContent = '曲目表格解析失败';
+            setLocalizedText(detailArea, 'detailTableParseFailed');
             return;
           }
 
+          clearLocalizedText(detailArea);
           detailArea.innerHTML = '';
           detailArea.appendChild(detailTable);
         } catch (err) {
-          detailArea.textContent = '曲目解析失败';
+          setLocalizedText(detailArea, 'detailParseFailed');
         }
       },
       onerror: function () {
-        detailArea.textContent = '曲目加载失败';
+        setLocalizedText(detailArea, 'detailLoadFailed');
       }
     });
   }
@@ -1409,7 +1565,8 @@
     }
 
     if (!query) {
-      mainArea.textContent = '请输入搜索关键字';
+      setLocalizedText(mainArea, 'enterSearchKeyword');
+      clearLocalizedText(detailArea);
       detailArea.innerHTML = '';
       setResultPanelSearching(panelParts, false);
       return;
@@ -1419,7 +1576,8 @@
       panelParts.searchInput.value = query;
     }
     setResultPanelSearching(panelParts, true);
-    mainArea.textContent = '加载中...';
+    setLocalizedText(mainArea, 'loading');
+    clearLocalizedText(detailArea);
     detailArea.innerHTML = '';
 
     fetchAnisonTableWithFallback(query, function (srcTable, usedQuery) {
@@ -1430,6 +1588,7 @@
         applyTableStyle(table);
         addDetailButtons(table, detailArea);
 
+        clearLocalizedText(mainArea);
         mainArea.innerHTML = '';
         mainArea.appendChild(table);
         if (panelParts && panelParts.searchInput && usedQuery) {
@@ -1440,12 +1599,12 @@
       } catch (err) {
         if (!isCurrentSearch()) return;
         setResultPanelSearching(panelParts, false);
-        mainArea.textContent = '解析失败';
+        setLocalizedText(mainArea, 'parseFailed');
       }
     }, function () {
       if (!isCurrentSearch()) return;
       setResultPanelSearching(panelParts, false);
-      mainArea.textContent = '未找到表格数据（已尝试符号归一化搜索）';
+      setLocalizedText(mainArea, 'noTableData');
     });
   }
 
@@ -1475,14 +1634,14 @@
       'align-items:center',
       'gap:6px',
       'margin:0 auto 8px',
-      'max-width:640px'
+      'max-width:736px'
     ].join(';');
 
     const searchInput = document.createElement('input');
     searchInput.type = 'search';
     searchInput.className = 'anison-query-input';
-    searchInput.placeholder = '搜索 anison.info';
-    searchInput.title = '编辑搜索关键字后点击搜索';
+    setLocalizedAttribute(searchInput, 'placeholder', 'searchPlaceholder');
+    setLocalizedAttribute(searchInput, 'title', 'searchHint');
     searchInput.style.cssText = [
       'flex:1 1 auto',
       'min-width:0',
@@ -1500,8 +1659,8 @@
     searchBtn.type = 'submit';
     searchBtn.className = 'anison-search-btn';
     searchBtn.textContent = '⌕';
-    searchBtn.setAttribute('aria-label', '搜索');
-    searchBtn.title = '搜索';
+    setLocalizedAttribute(searchBtn, 'aria-label', 'search');
+    setLocalizedAttribute(searchBtn, 'title', 'search');
     searchBtn.style.cssText = [
       'flex:0 0 28px',
       'width:28px',
@@ -1517,6 +1676,38 @@
     ].join(';');
     applyButtonFeedback(searchBtn);
 
+    const languageSelect = document.createElement('select');
+    languageSelect.className = 'anison-language-select';
+    setLocalizedAttribute(languageSelect, 'aria-label', 'language');
+    setLocalizedAttribute(languageSelect, 'title', 'languageHint');
+    [
+      { value: 'ja', label: '日本語' },
+      { value: 'en', label: 'English' }
+    ].forEach(function (item) {
+      const option = document.createElement('option');
+      option.value = item.value;
+      option.textContent = item.label;
+      languageSelect.appendChild(option);
+    });
+    languageSelect.value = uiLanguage;
+    languageSelect.style.cssText = [
+      'flex:0 0 84px',
+      'width:84px',
+      'height:28px',
+      'padding:0 5px',
+      'font-size:11px',
+      'line-height:26px',
+      'border:1px solid #4a4d52',
+      'border-radius:3px',
+      'background:#24262a',
+      'color:#cfd4dc',
+      'cursor:pointer',
+      'opacity:.86'
+    ].join(';');
+    languageSelect.addEventListener('change', function () {
+      setUiLanguage(languageSelect.value);
+    });
+
     const mainArea = document.createElement('div');
     mainArea.className = 'anison-main-area';
     const detailArea = document.createElement('div');
@@ -1524,6 +1715,7 @@
     detailArea.style.marginTop = '10px';
     searchForm.appendChild(searchInput);
     searchForm.appendChild(searchBtn);
+    searchForm.appendChild(languageSelect);
     panel.appendChild(searchForm);
     panel.appendChild(mainArea);
     panel.appendChild(detailArea);
@@ -1533,6 +1725,7 @@
       searchForm: searchForm,
       searchInput: searchInput,
       searchBtn: searchBtn,
+      languageSelect: languageSelect,
       mainArea: mainArea,
       detailArea: detailArea
     };
@@ -1558,6 +1751,7 @@
       searchForm: panel.querySelector('.anison-search-form'),
       searchInput: panel.querySelector('.anison-query-input'),
       searchBtn: panel.querySelector('.anison-search-btn'),
+      languageSelect: panel.querySelector('.anison-language-select'),
       mainArea: panel.querySelector('.anison-main-area'),
       detailArea: panel.querySelector('.anison-detail-area')
     };
@@ -1612,7 +1806,7 @@
 
     btn.addEventListener('click', function (e) {
       e.preventDefault();
-      flashButtonText(btn, panelParts.panel.style.display === 'none' ? '展开中' : '处理中', 450);
+      flashButtonText(btn, uiText(panelParts.panel.style.display === 'none' ? 'opening' : 'working'), 450);
 
       if (loaded) {
         panelParts.panel.style.display = panelParts.panel.style.display === 'none' ? 'block' : 'none';
@@ -1710,7 +1904,7 @@
 
       itemBtn.addEventListener('click', function (e) {
         e.preventDefault();
-        flashButtonText(itemBtn, '加载中', 550);
+        flashButtonText(itemBtn, uiText('loadingShort'), 550);
         performPanelSearch(panelParts, queryTitle);
       });
 
@@ -1799,7 +1993,7 @@
       itemBtn.addEventListener('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
-        flashButtonText(itemBtn, '加载中', 550);
+        flashButtonText(itemBtn, uiText('loadingShort'), 550);
         performPanelSearch(panelParts, queryTitle);
       });
 
@@ -1822,6 +2016,7 @@
   }
 
   function initAllEntryPoints() {
+    uiLanguage = getUiLanguage();
     previewMode = getPreviewMode();
     autoMoraInlineEnabled = getAutoMoraInlineEnabled();
     setupSubjectOrWorkPage();
@@ -1858,6 +2053,10 @@
     if (e.key === AUTO_MORA_INLINE_KEY) {
       autoMoraInlineEnabled = getAutoMoraInlineEnabled();
       refreshAutoMoraInlineToggles();
+    }
+    if (e.key === UI_LANGUAGE_KEY) {
+      uiLanguage = getUiLanguage();
+      refreshLocalizedUi();
     }
   });
 
