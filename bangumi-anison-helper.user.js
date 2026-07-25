@@ -3,7 +3,7 @@
 // @name:ja      Bangumi Anison Helper - アニメ主題歌検索
 // @name:en      Bangumi Anison Helper - Anime Theme Song Search
 // @namespace    https://github.com/dragonwang71/bangumi-anison-helper
-// @version      1.1.0
+// @version      1.1.1
 // @description  Bangumi・Annictの作品ページにアニメ主題歌情報を表示し、Mora試聴とYouTube検索を追加します。
 // @description:ja Bangumi・Annictの作品ページにアニメ主題歌情報を表示し、Mora試聴とYouTube検索を追加します。
 // @description:en Show anime opening and ending songs on Bangumi and Annict with Mora previews and YouTube search.
@@ -11,14 +11,10 @@
 // @supportURL   https://github.com/dragonwang71/bangumi-anison-helper/issues
 // @updateURL    https://raw.githubusercontent.com/dragonwang71/bangumi-anison-helper/main/bangumi-anison-helper.user.js
 // @downloadURL  https://raw.githubusercontent.com/dragonwang71/bangumi-anison-helper/main/bangumi-anison-helper.user.js
-// @match        https://bangumi.tv/subject/*
-// @match        http://bangumi.tv/subject/*
-// @match        https://bangumi.tv/anime*
-// @match        http://bangumi.tv/anime*
-// @match        https://annict.com/works
-// @match        http://annict.com/works
-// @match        https://annict.com/works/*
-// @match        http://annict.com/works/*
+// @match        https://bangumi.tv/*
+// @match        http://bangumi.tv/*
+// @match        https://annict.com/*
+// @match        http://annict.com/*
 // @grant        GM_xmlhttpRequest
 // @connect      anison.info
 // @connect      mora.jp
@@ -2015,7 +2011,20 @@
     return true;
   }
 
+  function isSupportedEntryPointRoute() {
+    const host = location.hostname;
+    const path = location.pathname;
+    if (host === 'annict.com' || host.endsWith('.annict.com')) {
+      return /^\/works(?:\/|$)/.test(path);
+    }
+    if (host === 'bangumi.tv' || host.endsWith('.bangumi.tv')) {
+      return /^\/(?:subject|anime)(?:\/|$)/.test(path);
+    }
+    return false;
+  }
+
   function initAllEntryPoints() {
+    if (!isSupportedEntryPointRoute()) return;
     uiLanguage = getUiLanguage();
     previewMode = getPreviewMode();
     autoMoraInlineEnabled = getAutoMoraInlineEnabled();
@@ -2041,7 +2050,8 @@
     document.addEventListener('DOMContentLoaded', scheduleInit, { once: true });
   }
 
-  // Annict uses Turbo partial navigation; re-run on route/view switches.
+  // Domain-wide @match rules let these listeners survive navigation from pages
+  // outside the supported routes. Annict uses Turbo partial navigation.
   document.addEventListener('turbo:load', scheduleInit);
   document.addEventListener('turbo:render', scheduleInit);
   document.addEventListener('turbo:frame-load', scheduleInit);
@@ -2063,7 +2073,7 @@
   const observerTarget = document.documentElement || document.body;
   if (observerTarget) {
     const observer = new MutationObserver(function () {
-      scheduleInit();
+      if (isSupportedEntryPointRoute()) scheduleInit();
     });
     observer.observe(observerTarget, { childList: true, subtree: true });
   }

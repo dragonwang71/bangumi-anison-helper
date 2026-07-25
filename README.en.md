@@ -28,6 +28,7 @@ Supported pages:
 - Choose Japanese or English controls, with Japanese as the default
 - Try multiple title variants that account for seasons, punctuation, and spelling differences
 - Search individual works directly from Bangumi and Annict list pages
+- Show buttons immediately after navigating from the Annict home page, without a reload
 
 ## Usage
 
