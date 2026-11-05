@@ -4,7 +4,7 @@
 // @name:en      Bangumi Anison Helper - Anime Theme Song Search
 // @name:zh-CN   Bangumi Anison Helper - 动画主题曲搜索
 // @namespace    https://github.com/dragonwang71/bangumi-anison-helper
-// @version      1.1.3
+// @version      1.1.4
 // @description  Bangumi・Annict・MyAnimeListの作品ページにアニメ主題歌情報を表示し、Mora試聴とYouTube検索を追加します。
 // @description:ja Bangumi・Annict・MyAnimeListの作品ページにアニメ主題歌情報を表示し、Mora試聴とYouTube検索を追加します。
 // @description:en Show anime opening and ending songs on Bangumi, Annict, and MyAnimeList with Mora previews and YouTube search.
@@ -922,7 +922,21 @@
     });
   }
 
-  function toRealAnisonUrl(href) {
+  function toRealAnisonUrl(href, link) {
+    // Anison now stores link targets in data attributes instead of href.
+    if (link) {
+      const mode = link.getAttribute('data-mode');
+      const category = link.getAttribute('data-cat') || '';
+      const encodedId = link.getAttribute('data-page') || '';
+      if ((mode === 'link' || mode === 'url') && /^[a-z][a-z0-9_-]*$/i.test(category) && encodedId) {
+        try {
+          const id = atob(encodedId);
+          if (/^\d+$/.test(id)) return `http://anison.info/data/${category}/${id}.html`;
+        } catch (e) {
+          // Keep processing the other links if one encoded target is malformed.
+        }
+      }
+    }
     const raw = (href || '').trim();
     const m = raw.match(/javascript:link\('([^']+)','([^']+)'\)/);
     if (m) return `http://anison.info/data/${m[1]}/${m[2]}.html`;
@@ -1392,7 +1406,7 @@
 
   function normalizeLinks(root) {
     root.querySelectorAll('a[href]').forEach(function (a) {
-      const realUrl = toRealAnisonUrl(a.getAttribute('href') || '');
+      const realUrl = toRealAnisonUrl(a.getAttribute('href') || '', a);
       a.href = realUrl;
       a.target = '_blank';
       a.rel = 'noopener noreferrer';
